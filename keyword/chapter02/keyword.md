@@ -181,24 +181,24 @@
     - 만약 사용자가 **username: admin' -- **, **password: 빈칸**으로 입력한다면 다음과 같은 쿼리가 실행된다.
 
   ``` sql
-	SELECT * FROM users WHERE username = 'admin' --' AND password = '';
+	 SELECT * FROM users WHERE username = 'admin' --' AND password = '';
   ```
 
   -> **뒤에 있는 조건이 무시되어 비밀번호 검증 없이 로그인이 성공한다.**
 
+
 - SQL Injection 공격 예시
+  
+  - 인증 우회
+    - 항상 참인 조건으로 로그인을 우회한다.
 
-    - 인증 우회
+  - 데이터 유출
 
-        - 항상 참인 조건으로 로그인을 우회한다.
+      - 다른 테이블을 조인해서 민감 정보를 노출한다.
 
-    - 데이터 유출
+  - 데이터 삭제
 
-        - 다른 테이블을 조인해서 민감 정보를 노출한다.
-
-    - 데이터 삭제
-
-        - 사용자가 입력한 값이 끝나자마자, DROP TABLE을 실행해 데이터를 삭제한다.
+      - 사용자가 입력한 값이 끝나자마자, DROP TABLE을 실행해 데이터를 삭제한다.
 
 - SQL Injection 방어 방법
 
