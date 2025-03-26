@@ -108,3 +108,31 @@ FROM user u
 ```
 
 -> 유저 테이블에 많은 필드가 있을 것이기 때문에 마이 페이지 화면에서 필요한 정보만 조회하도록 설정했다.
+
+#### 시니어 미션. 정렬 기준을 1순위는 포인트로 2순위는 최신순으로 하여 Cursor기반 페이지네이션으로 구현
+
+<img src = "https://velog.velcdn.com/images/sm011212/post/1a0a2a60-cf9b-47b8-a5c2-1c11064b1d7a/image.png" width = "300">
+
+``` sql
+SELECT
+    m.id,
+    m.reward,
+    m.condition,
+    m.created_at,
+    s.name AS store_name,
+    um.status AS mission_status
+FROM user_mission um
+JOIN mission m ON um.mission_id = m.id
+JOIN store s ON m.store_id = s.id
+WHERE um.user_id = :userId
+  AND (
+        (m.reward < :lastReward)
+        OR (m.reward = :lastReward AND m.created_at < :lastCreatedAt)
+      )
+ORDER BY m.reward DESC, m.created_at DESC
+LIMIT :pageSize;
+```
+
+-> 정렬 기준 1순위로 reward를 desc, 2순위로 created_at을 desc 적용해주었다.
+
+-> 커서 기반 페이지네이션 구현을 위해 1.마지막 reward보다 reward값이 작거나, 2. 마지막 reward와 reward 값이 같으면 생성일자를 사용해 비교하도록 구현했다.
