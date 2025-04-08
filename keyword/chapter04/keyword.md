@@ -336,3 +336,47 @@
     - **final이나 @NonNull이 붙은 필드를 대상으로 생성자를 자동으로 생성해주는 어노테이션**
 
     - 이 어노테이션을 통해 **생성자 주입 방식을 사용할 수 있다.**
+
+## - 시니어 미션
+
+#### - 서블릿 VS Spring MVC 비교하기
+
+- **전통적인 서블릿 기반 개발과 Spring MVC의 차이**
+
+    - **전통적인 서블릿 기반 개발 방식**은 HttpServlet 클래스를 상속받아 doGet(), doPost() 메서드를 오버라이드 하는 방식이다.
+
+    - 또한 요청 파라미터를 직접 파싱하고, 응답을 직접 작성한다.
+
+    - Spring MVC 방식은 @Controller와 같은 어노테이션을 사용하며, @RequestMapping, @GetMapping, @PostMapping 등의 어노테이션으로 URI와 메서드를 매핑한다.
+
+    - 또한 @RequestParam, @RequestBody, DTO 등으로 요청을 바인딩하고, 응답은 return으로 반환한다.
+
+- **Spring MVC가 서블릿보다 편리한 이유**
+
+    - 전통적인 서블릿 방식은 요청 파라미터를 수동으로 파싱하며 응답을 수동으로 작성해야했다. 또한 비즈니스 로직도 컨트롤러 로직에 포함되는 문제가 있었다.
+
+    - 하지만 **Spring MVC 방식을 통해 요청과 응답, 파라미터 바인딩, 에러 처리, 유효성 검사 등이 모두 자동으로 처리되면서 테스트, 확장성, 유지보수 면에서 훨씬 간결해지게 되었다.**
+
+- **DispatcherServlet이 내부적으로 요청을 처리하는 방식**
+
+    - DispatcherServlet이란?
+
+        - Spring MVC에서 모든 HTTP 요청을 받아서 어떤 컨트롤러가 처리할지 결정하고, 응답까지 책임지는 컨트롤러
+
+    - DispatcherServlet의 요청 처리 단계
+
+        1. DispatcherServlet이 모든 요청을 가로챈다.
+
+        2. HandlerMapping을 조회해 URL과 매핑된 Controller 메서드를 찾는다.
+
+        3. 찾은 핸들러를 어떻게 실행할지 결정하기 위해 HandlerAdapter를 선택한다. (이 과정에서 파라미터 바인딩, 메시지 컨버팅 등의 과정이 수행된다.)
+
+        4. 바인딩 된 파라미터와 함께 실제 Controller 메서드가 호출된다.
+
+        5. ModelAndView 혹은 객체와 같은 리턴값을 수신한다.
+
+        6. ViewResolver로 뷰를 결정한다. (REST API이면 JSON으로 변환한다.)
+
+        7. 렌더링한 결과를 HttpServletResponse에 기록하고 반환한다.
+
+      ![](https://velog.velcdn.com/images/sm011212/post/e515f2f5-a740-463f-acc2-473bf4826503/image.png)
