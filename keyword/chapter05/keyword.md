@@ -8,7 +8,7 @@
 
 - ex) 온라인서점 사이트를 개발한다면, 온라인 서점은 도메인이 될 수 있다. 온라인 서점 도메인은 다시 주문, 결제, 배송같은 하위 도메인으로도 나뉠 수 있다.
 
-- **Domain vs Entity
+- **Domain vs Entity**
 
     - Domain은 서비스를 대표하는 개념이고, Entity는 Domain 내에 식별 가능한 객체
 
@@ -47,10 +47,10 @@
     - 연관관계 설정 시 한 쪽만 설정하는 실수를 할 수도 있으니, 다음과 같이 두 개의 연관관계 설정 코드를 한 코드에 묶은 것을 연관관계 편의 메서드라고 한다.
 
   ``` java
-	public void setTeam(Team team) {
-              this.team = team;
-	    team.getMembers().add(this);
-	}
+	 public void setTeam(Team team) {
+        this.team = team;
+	       team.getMembers().add(this);
+	 }
   ```
 
 #### - N + 1 문제
