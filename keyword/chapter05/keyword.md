@@ -151,7 +151,74 @@
         - 삭제(removed)
 
             - 삭제 예약 상태(flush 시 delete 쿼리 발생)
+
+## - 시니어 미션
+
+#### - @OneToMany 컬렉션을 조회할 때 List<'MemberPrefer'>를 Set<'MemberPrefer'>로 변경 후 차이점 분석하기
+
+- **List와 Set의 차이**
+
+    - List : 순서 보장, 중복 허용
+
+    - Set : 순서 없음, 중복 불허
+
+- **결론부터 말하면 List를 사용하는 것이 좋다.**
+
+- JPA에서 Set을 사용할 때 문제점
+
+    - JPA는 연관 관계가 Lazy Loading으로 구현되어 있는데, **Set의 경우 기존에 가지고 있던 Entity에 중복된 데이터가 있는지 비교하기 위해 Set에 있는 모든 데이터를 로딩해야 하고 이 때 Proxy가 강제로 초기화된다.**
+
+- ManyToMany 관계에서는 List보다 Set이 더 낫다고 한다. 하지만 ManyToMany 관계는 @ManyToMany 어노테이션 대신 매핑 테이블을 통해 구현하므로, Set을 사용할 일은 없을 것 같다.
+
+-> **연관관계 매핑 시 Set 대신 List를 사용하자.**
+
+#### - 데이터 정합성을 고려하여 orpanRemoval=true가 필요한 곳 확인 후 적용
+
+- **orphanRemoval이란?**
+
+    - 부모 엔티티가 자식 엔티티를 컬렉션에서 제거했을 때, 그 자식 엔티티를 DB에서도 자동으로 삭제해주는 기능
+
+    - 왜 필요할까?
+
+        - @OneToMany와 같은 관계에서 **부모 객체에서 자식을 컬렉션에서 제거해도 DB에서는 삭제가 되지 않고 관계만 끊기기 때문이다. ** orphanRemoval을 쓰면 이걸 자동으로 해결해준다.
+
+    - 즉, 독립적으로 존재가 불가능할 경우에 적용한다.
+
+    - 둘 이상의 부모와 연관관계를 맺을 경우, orphanRemoval 옵션을 false로 하는 것이 좋다.
+
+- **Cascade(영속성 전이)란?**
+
+    - 하나의 엔티티에 수행한 작업을 연관된 다른 엔티티에도 같이 수행하는 기능.
+
+    -  부모가 저장되거나 삭제되면 연관된 자식들도 자동으로 저장되거나 삭제되는 기능
+
+    - CascadeType 종류
+
+        - PERSIST : 부모 저장 시 자식도 저장
+
+        - MERGE : 부모 수정 시 자식도 수정
+
+        - REMOVE : 부모 삭제 시 자식도 삭제
+
+        - REFRESH : 부모를 새로고침하면 자식도 새로고침
+
+        - DETACH : 부모를 영속성 컨텍스트에서 분리하면 자식도 분리
+
+        - ALL : 위의 모든 작업을 전파
+
+- **orphanRemoval과 Cascade의 차이는 무엇일까?**
+
+    - **orphanRemoval은 컬렉션에서 제거되어 관계가 끊겼을 때 삭제를 한다.**
+
+    - **cascade = REMOVE은 부모 엔티티가 삭제될 때 같이 삭제를 한다.**
+
+
+- **orphanRemove=true가 필요한 곳은 어디가 있을까?**
   
-  
-  
-  
+<img src = "https://velog.velcdn.com/images/sm011212/post/ba8ec945-f114-45ac-b217-7c207ab361d3/image.png" width = "600">
+
+- ERD를 보면 N:1 관계가 여러 상황에서 쓰이고 있다.
+
+- member_agree, member_prefer, review, member_mission 엔티티는 두 개 이상의 엔티티와 N:1 관계를 맺고 있기 때문에, orphanRemoval=true 옵션이 좋지 않다고 생각한다.
+
+- review_image의 경우 특정 review 엔티티에 종속적이고, review 엔티티의 컬렉션에서 제거되면 고아 객체가 되기 때문에 이 때는 orphanRemoval=true 옵션을 사용해도 괜찮다고 생각한다.
