@@ -222,3 +222,158 @@
 - member_agree, member_prefer, review, member_mission 엔티티는 두 개 이상의 엔티티와 N:1 관계를 맺고 있기 때문에, orphanRemoval=true 옵션이 좋지 않다고 생각한다.
 
 - review_image의 경우 특정 review 엔티티에 종속적이고, review 엔티티의 컬렉션에서 제거되면 고아 객체가 되기 때문에 이 때는 orphanRemoval=true 옵션을 사용해도 괜찮다고 생각한다.
+
+#### - 하나의 트랜잭션에서 여러 엔티티를 처리하는 비즈니스 로직 작성
+
+- **@Modifying 어노테이션이란?**
+
+    - JPA에서 INSERT, UPDATE, DELETE 처럼 데이터를 변경하는 쿼리를 작성할 때 사용하는 어노테이션
+
+    - JPA의 기본 **@Query는 조회용 쿼리만 지원한다.**
+
+    - 쿼리가 단순 조회가 아니라 변경 작업임을 명시하기 위해 @Modifying을 사용한다.
+
+    - 사용 예시
+
+      ``` java
+      @Modifying
+      @Query("UPDATE Member m SET m.name = :name WHERE m.id = :id")
+      int updateMemberName(@Param("id") Long id, @Param("name") String name);
+      ```
+
+- **하나의 트랜잭션에서 여러 엔티티를 처리하는 비즈니스 로직 작성**
+
+    - 먼저 다음과 같이 비즈니스 로직을 작성할 수 있다.
+
+      ``` java
+      @Transactional
+      public void deleteMember(Long memberId) {
+          reviewRepository.deleteByMemberId(memberId);     // 리뷰 삭제
+          bookmarkRepository.deleteByMemberId(memberId);   // 찜 삭제
+          orderRepository.deleteByMemberId(memberId);       // 주문 삭제
+          memberRepository.deleteById(memberId);            // 회원 삭제
+      }
+      ```
+    - 리포지토리에서는 다음과 같이 작성할 수 있다.
+
+      ``` java
+      @Modifying
+      @Query("DELETE FROM Review r WHERE r.member.id = :memberId")
+      void deleteByMemberId(@Param("memberId") Long memberId);
+      ```
+
+#### - 동시성 문제가 발생할 수 있는 시나리오를 고민하고 해결책 적용
+
+- **동시성 문제란?**
+
+    - 여러 사용자가 동시에 같은 데이터에 접근하거나 수정할 떄, 데이터 일관성이 깨지거나 얘기치 않은 결과가 발생하는 문제
+
+    - 데이터 무결성과 관련된 중요한 문제이다.
+
+    - 동시성 문제가 발생하는 상황
+
+        - 동시 업데이트, 중복 삽입, 삭제/수정 중 충돌, 낙관적/비관적 락 실패
+
+        - ex) 동일 사용자가 다른 디바이스로 접속 시, 포인트 충전/차감 동시 발생, 여러 번 찜하기, 마지막 남은 재고를 두 명이 동시에 구매
+
+    - 동시성 문제가 발생하면 생기는 결과
+
+        - 데이터 유실, 데이터 중복, 무결성 제약 위반, 프로그램 오류 발생
+
+    - 동시성 문제를 해결하는 방법
+
+        - **낙관적 락**, **비관적 락**, Unique 제약 조건(중복이 안 될 때만) 등
+
+- **낙관적 락(Optimistic Lock)**
+
+    - 락을 미리 걸지 않고, 데이터를 수정할 때 버전을 체크해서 충돌을 감지하는 방식
+
+    - 동작 흐름
+
+        1. 데이터를 조회할 때 버전 값을 함께 읽는다.
+
+        2. 업데이트 할 때 버전 값을 비교한다.
+
+        3. 만약 내가 읽었던 버전과 DB 버전이 다르면 충돌이 감지되어 OptimisticLockException이 발생한다.
+
+    - 코드 예시
+
+      ``` java
+      @Entity
+      public class Member {
+          @Id @GeneratedValue
+          private Long id;
+  
+          @Version
+          private Long version;  // @Version을 추가하면 Hibernate가 자동으로 버전 관리를 해준다.
+  
+          private String name;
+      }
+      ```
+
+    - 장점
+
+        - Lock이 없어서 대부분의 경우 성능이 좋다.
+
+        - 대량 읽기 시스템에 적합하다.
+
+    - 단점
+
+        - 충돌 발생 시 예외 처리가 필요하다.
+
+        - 충돌 시 재시도 로직이 필요하다.
+
+  -> 트래픽이 많고 읽기 성능이 중요하지만, 데이터 충돌 가능성이 낮거나 충돌 발생 시 처리를 할 수 있을 때 사용하면 좋다.
+
+    - 사용 예시
+
+        - 게시판 게시글 좋아요
+
+        - 상품 조회수 증가
+
+        - 프로필 수정
+
+        - 일반 게시글 수정
+
+
+- **비관적 락(Pessimistic Lock)**
+
+    - 데이터를 조회할 때부터 다른 트랜잭션이 읽거나 수정을 못하게 락을 잡는 방식
+
+    - 동작 흐름
+
+        1. 데이터를 조회할 때 SELECT FOR UPDATE와 같은 SQL이 실행된다.
+
+        2. 해당 데이터를 다른 트랜잭션이 접근하려고 하면 대기하거나 실패한다.
+
+        3. 내 트랜잭션이 완료되면 락이 풀린다.
+
+    - 코드 예시
+
+  ``` java
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT s FROM Store s WHERE s.id = :id")
+  Store findByIdForUpdate(@Param("id") Long id);
+  ```
+
+    - 장점
+
+        - 충돌을 아예 막을 수 있다. -> 데이터 일관성을 확보할 수 있다.
+
+    - 단점
+
+        - 트래픽이 많으면 락 경쟁이 발생, 데드락 발생 가능성이 있다.
+
+        - 락을 기다리는 동안 대기를 해야하므로 성능 저하가 발생한다.
+
+  -> 트래픽이 많지 않지만 데이터 충돌 가능성이 높고 데이터 일관성이 우선일 때 사용한다.
+
+    - 사용 예시
+
+        - 재고 감소 처리
+
+        - 포인트 차감
+
+        - 좌석 예약 시스템
+
+        - 결제/송금 처리
