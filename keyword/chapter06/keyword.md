@@ -150,4 +150,103 @@
         - 간단한 쿼리를 작성할 때도 길이가 조금 길어진다.
 
 -> **간단한 조회 쿼리는 JPQL로**, **복잡한 동작 쿼리, 타입 안정성이 중요하면 QueryDSL**을 사용하자.
+
+## - 시니어 미션
+
+이미 한 차례 QueryDSL로 리팩토링을 해서 간단하게만 남기겠습니다 ㅠㅠ
+
+저는 트리 형식의 폴더 구조를 구현해야 하는 프로젝트를 진행했고, 복잡한 쿼리가 익숙하지 않고, JpaRepository 인터페이스 구현체에 익숙했던 상태였습니다.
+
+그 당시에는 다음과 같이 서비스 로직에서 불필요하게 코드를 작성했던 기억이 있습니다.
+
+```java
+@Override
+    public FolderResponseDto findFolder(Long userId, Long folderId) {
+
+        Optional<Folder> optionalFolder = folderRepository.findById(folderId);
+
+        if (optionalFolder.isPresent() && optionalFolder.get().getUser().getId().equals(userId)) {
+
+            Folder folder = optionalFolder.get();
+
+            FolderThumbnailResponseDto parentFolder = null;
+            if (folder.getParentFolder() != null) {
+                parentFolder = FolderThumbnailResponseDto.builder()
+                        .folderId(folder.getParentFolder().getId())
+                        .folderName(folder.getParentFolder().getName())
+                        .build();
+            }
+
+            List<FolderThumbnailResponseDto> subFolders = null;
+
+            if (folder.getSubFolders() != null && !folder.getSubFolders().isEmpty()) {
+                subFolders = folder.getSubFolders().stream().map(subFolder -> FolderThumbnailResponseDto.builder()
+                        .folderId(subFolder.getId())
+                        .folderName(subFolder.getName())
+                        .build()).toList();
+            }
+
+            List<ProblemResponseDto> problems = problemService.findAllProblemsByFolderId(folderId);
+
+            return FolderResponseDto.builder()
+                    .folderId(folder.getId())
+                    .folderName(folder.getName())
+                    .parentFolder(parentFolder)
+                    .subFolders(subFolders)
+                    .problems(problems)
+                    .updateAt(folder.getUpdatedAt())
+                    .createdAt(folder.getCreatedAt())
+                    .build();
+        }
+
+        throw new FolderNotFoundException("공책을 찾을 수 없습니다!, folderId: " + folderId);
+    }
+```
+
+하지만 QueryDSL을 사용해 N + 1 문제를 해결하면서 복잡한 쿼리 없이 조회 쿼리를 완성했습니다.
+
+```java
+@Override
+    public Optional<Folder> findFolderWithDetailsByFolderId(Long folderId) {
+        Folder folder = queryFactory.selectFrom(QFolder.folder)
+                .leftJoin(QFolder.folder.subFolderList, new QFolder("subFolder")).fetchJoin()
+                .leftJoin(QFolder.folder.parentFolder, new QFolder("parentFolder")).fetchJoin()
+                .where(QFolder.folder.id.eq(folderId))
+                .fetchOne();
+
+        return Optional.ofNullable(folder);
+    }
+```
+
+- **@Transactional(readOnly = true) 적용 여부에 따른 실행 속도 차이 테스트**
+
+    - Transactional(readOnly=true)란?
+        - 트랜잭션을 읽기 전용으로 설정한다.
+
+        - 트랜잭션 범위 안에서 생성, 수정, 삭제가 발생해도 flush 시점에 변경 내용을 DB에 반영하지 않는다.
+
+        - 엔티티 스냅샷을 유지하지 않아 더티체킹 비용이 사라진다.
+
+        - 메서드가 조회만 담당한다는 것을 명확히 표현해준다.
+
+    - 조사 결과 1000건 이하에서는 5ms 미만의 차이가 발생하지만, 10000건 이상의 대규모 데이터에서는 20%의 개선까지 관찰된다고 합니다.
+
+- **@BatchSize(size = 100)설정 후, 쿼리 실행 횟수 변화 확인**
+
+    - BatchSize는 왜 쓰는걸까?
+        - @BatchSize(size = X) 를 설정하면,
+          Hibernate가 최대 X개씩 묶어서 한 번에 SELECT ... WHERE id IN (...) 형태로 가져온다.        
+          → 1 + N 개가 1 + [N/X]개로 줄어든다.
+
+        - ex) A를 1번 조회할 때 B를 1000개 지연로딩으로 가져온다고 치면, Batchsize=100을 적용했을 때,  A 1번, B 10번의 쿼리만으로 가져올 수 있다. (1000/100 = 10)
+
+            - 만약 B에 250개의 데이터가 있다고 치면 250/100 = 3개의 쿼리만으로 가져올 수 있다.
+
+    - Fetch join과의 차이가 뭘까?
+
+        - Fetch join은 언제나 1번의 쿼리가 나가지만, **조인된 행이 곱해져 결과가 중복된다.**
+
+        - Batchsize는 쿼리 결과에 중복이 없어 각 배치별로 고유한 연관 데이터만 조회된다.
+
+    - 하지만, **BatchSize가 너무 크면 SQL 문자열 길이가 길어지고, 네트워크로 전송되는 패킷 크기가 커져 오히려 응답 시간이 늘어날 수도 있기 때문에**, 적당한 BatchSize를 설정하는 것이 중요하다.
   
