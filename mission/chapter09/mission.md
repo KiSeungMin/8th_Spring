@@ -77,3 +77,64 @@ public class PageableIndexValidator implements ConstraintValidator<ValidPageable
         return ApiResponse.onSuccess(reviewQueryService.findUserReviews(memberId, pageable));
     }
 ```
+
+#### 2. 특정 가게의 미션 목록 조회
+
+- 먼저 다음과 같이 repository에 페이징을 적용해 가게의 모든 미션 목록을 조회하는 메서드를 만들었다.
+
+``` java
+    @Override
+    public Page<Mission> findMissionsByStore(
+            Long storeId,
+            Pageable pageable
+    ) {
+        List<Mission> content = jpaQueryFactory
+                .selectFrom(mission)
+                .join(mission.store, store).fetchJoin()
+                .where(
+                        store.id.eq(storeId)
+                )
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .orderBy(mission.id.asc())
+                .fetch();
+
+        Long totalCount = jpaQueryFactory
+                .select(mission.count())
+                .from(mission)
+                .join(mission.store, store)
+                .where(
+                        store.id.eq(storeId)
+                )
+                .fetchOne();
+
+        long total = (totalCount != null ? totalCount : 0L);
+
+        return new PageImpl<>(content, pageable, total);
+    }
+```
+
+- service에서는 1번과 마찬가지로 결과값을 dto로 변환해 반환하도록 메서드를 구현했다.
+
+``` java
+    @Override
+    public Page<MissionResponseDto.JoinResultDTO> findStoreMissions(Long storeId, Pageable pageable) {
+        Page<Mission> storeMissions = storeRepository.findMissionsByStore(storeId, pageable);
+
+        return storeMissions.map(MissionConverter::toJoinResultDTO);
+    }
+```
+
+- 컨트롤러 로직에서는 가게의 모든 미션들을 조회해야 하기 때문에 엔드포인트로 /{storeId}/missions로 설정해주었다. 또한, @PageableDefault 어노테이션을 사용해 한 번에 조회되는 리뷰의 개수를 기본 10개로 설정해주었다. 이전에 생성한 페이징 검증 어노테이션도 적용해주었다.
+
+``` java
+    @GetMapping("/{storeId}/missions")
+    public ApiResponse<Page<MissionResponseDto.JoinResultDTO>> getStoreMissions(
+            @ValidPageableIndex
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable,
+            @PathVariable("storeId") Long storeId
+    ) {
+        return ApiResponse.onSuccess(storeQueryService.findStoreMissions(storeId, pageable));
+    }
+```
