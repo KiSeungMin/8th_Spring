@@ -138,3 +138,67 @@ public class PageableIndexValidator implements ConstraintValidator<ValidPageable
         return ApiResponse.onSuccess(storeQueryService.findStoreMissions(storeId, pageable));
     }
 ```
+
+#### 3, 4. 내가 진행중, 진행완료한 미션 목록 조회
+
+- 먼저 다음과 같이 repository에 페이징을 적용해 가게의 모든 미션 목록을 조회하는 메서드를 만들었다. 진행중, 진행 완료한 미션을 검색 조건에 따라 조회해야 하므로, **MissionStatus 값을 저장하고 있는 status 필드를 전달받아 status와 일치하는 값만 조회하도록 where 절을 설정했다.**
+
+```
+    @Override
+    public Page<MemberMission> findMissionsByMember(
+            Long memberId,
+            MissionStatus status,
+            Pageable pageable
+    ) {
+        List<MemberMission> content = jpaQueryFactory
+                .selectFrom(memberMission)
+                .join(memberMission.member).fetchJoin()
+                .where(
+                        memberMission.id.eq(memberId),
+                        memberMission.status.eq(status)
+                )
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .orderBy(memberMission.id.asc())
+                .fetch();
+
+        Long totalCount = jpaQueryFactory
+                .select(memberMission.count())
+                .from(memberMission)
+                .join(memberMission.member)
+                .where(
+                        member.id.eq(memberId)
+                )
+                .fetchOne();
+
+        long total = (totalCount != null ? totalCount : 0L);
+
+        return new PageImpl<>(content, pageable, total);
+    }
+```
+
+- service에서는 1번과 마찬가지로 결과값을 dto로 변환해 반환하도록 메서드를 구현했다.
+
+``` java
+    @Override
+    public Page<MemberMissionResponseDto.JoinResultDTO> findMemberMissions(Long memberId, MissionStatus status, Pageable pageable) {
+        Page<MemberMission> memberMissions = memberRepository.findMissionsByMember(memberId, status, pageable);
+
+        return memberMissions.map(MemberMissionConverter::toJoinResultDTO);
+    }
+```
+
+- 컨트롤러 로직에서는 가게의 모든 미션들을 조회해야 하기 때문에 엔드포인트로 /{memberId}/missions로 설정해주었다. 또한, @PageableDefault 어노테이션을 사용해 한 번에 조회되는 리뷰의 개수를 기본 10개로 설정해주었다. 이전에 생성한 페이징 검증 어노테이션도 적용해주었다. 또한, 3번과 4번 미션이 각각 검색 조건을 진행중, 진행 완료로 검색하기 때문에 mission의 상태를 query parameter로 전달할 수 있도록 **status 값을 @RequestParam으로 설정해주었다.**
+
+``` java
+    @GetMapping("/{memberId}/missions")
+    public ApiResponse<Page<MemberMissionResponseDto.JoinResultDTO>> getMemberMissions(
+            @ValidPageableIndex
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable,
+            @RequestParam MissionStatus status,
+            @PathVariable("memberId") Long memberId
+    ) {
+        return ApiResponse.onSuccess(memberCommandService.findMemberMissions(memberId, status, pageable));
+    }
+```
