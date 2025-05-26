@@ -1,3 +1,131 @@
+## - 시니어 미션
+
+#### - Slice와 Page의 구조적 차이와 적용 시점 파악하기
+
+**1. Page와 Slice가 각각 어떻게 출력값이 나오는 지 알아보기**
+
+- **Page를 적용했을 때**
+
+  ``` java
+  {
+    "isSuccess": true,
+    "code": "COMMON200",
+    "message": "성공입니다.",
+    "result": {
+      "reviewList": [
+        {
+          "ownerNickname": "string",
+          "score": 3,
+          "body": "고생",
+          "createdAt": "2024-09-27"
+        },
+        {
+          "ownerNickname": "string",
+          "score": 4,
+          "body": "많으셨습니다!",
+          "createdAt": "2024-09-27"
+        }
+      ],
+      "listSize": 2,
+      "totalPage": 1,          
+      "totalElements": 2,      
+      "isFirst": true,
+      "isLast": true,
+      "pageNumber": 0,         
+      "pageSize": 10,          
+      "numberOfElements": 2    
+    }
+  }
+  ```
+
+  -> totalPage, totalElement, pageNumber, pageSize, numberOfElements 등의 정보를 통해 **전체 페이지 정보를 파악할 수 있다.**
+
+- **Slice를 적용했을 때**
+
+  ``` java
+  {
+    "isSuccess": true,
+    "code": "COMMON200",
+    "message": "성공입니다.",
+    "result": {
+      "reviewList": [
+        {
+          "ownerNickname": "string",
+          "score": 3,
+          "body": "고생",
+          "createdAt": "2024-09-27"
+        },
+        {
+          "ownerNickname": "string",
+          "score": 4,
+          "body": "많으셨습니다!",
+          "createdAt": "2024-09-27"
+        }
+      ],
+      "listSize": 2,
+      "isFirst": true,
+      "isLast": true,
+      "hasNext": false
+    }
+  }
+  ```
+
+  -> **총 개수/총 페이지 정보는 빠지고, 대신 다음 페이지가 있는지 여부만 제공한다.**
+
+**2. Page, Slice 각각 적용 시 장단점 파악하기**
+
+- **Page를 적용했을 때 장점**
+
+    - totalElements, totalPages, pageNumber, pageSize, numberOfElements 등 **페이징에 필요한 모든 정보를 반환한다.**
+
+    - 클라이언트에서 총 몇 건, 몇 페이지인지 바로 확인할 수 있어서 **페이지 네비게이션 등의 구현이 쉬워진다.**
+
+    - 사용자가 **임의의 페이지로 건너뛰기 하기가 쉬워진다.**
+
+    - **전체 건수를 정확히 표시해야 하는 경우 필수적이다.**
+
+- **Page를 적용했을 때 단점**
+
+    - **count(*)를 위한 별도가 항상 실행되기 때문에** 데이터 규모가 크거나 복잡한 조인/조건이 많으면 응답 시간이 늘어난다.
+
+    - 트래픽이 많거나 실시간성이 중요할 경우 지연이 발생한다.
+
+- **Slice를 적용했을 때 장점**
+
+    - **전체 count 쿼리가 실행되지 않아 조회 성능이 훨씬 빠르다.**
+
+    - 첫 페이지나 반복 호출이 빈번할 때 사용하기 좋다.
+
+    - hasNext() 정보만 제공하기 때문에 **더 불러오기, 무한 스크롤 구현이 쉬워진다.**
+
+- **Slice를 적용했을 때 단점**
+
+    - **전체 건수와 페이지를 알 수 없어 마지막 페이지라는 사실만 알 수 있다.**
+
+    - 총 X건의 정보를 표기할 수 없다.
+
+    - 사용자가 임의 접근하기가 어렵고, 이전/다음 접근만 할 수 있다.
+
+**3. 언제 적용하면 좋을 지 파악하기**
+
+- **Page를 적용하면 좋을 때**
+
+    - 전체 건수, 전체 페이지, 현재 페이지 정보가 필요할 때
+
+    - 임의의 페이지로 자유롭게 이동할 수 있어야 할 때
+
+    - ex) 관리자 대시보드, 검색 결과 페이징
+
+- **Slice를 적용하면 좋을 때**
+
+    - 무한 스크롤, 더 보기 버튼으로 연속 데이터를 로딩할 때
+
+    - 전체 카운트가 필요하지 않고, 즉각저인 응답 속도가 더 중요할 때
+
+    - 대규모 데이터를 대상으로 빈번히 호출될 때
+
+    - ex) 피드, 무한 스크롤, 더보기
+
 ## - 실습 기록
 
 #### - 페이징 검증 어노테이션 생성
