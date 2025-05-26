@@ -75,7 +75,7 @@
 
     - **서비스 로직**
 
-      ```
+      ``` java
       public Page<User> searchUsers(UserSearchDto cond, Pageable pageable) {
           return userRepository.searchByCondition(cond, pageable);
       }
